@@ -1,0 +1,68 @@
+# Range Breakout Strategy configuration.
+# All times are wall-clock America/New_York and are interpreted with that
+# timezone pinned explicitly (never an ambient/server timezone).
+
+instrument:
+  symbol: "MES"          # Tradovate contract symbol root, e.g. MES or ES
+  point_value: 5.0        # $ per point for MES (ES = 50.0) - validated at startup
+  tick_size: 0.25
+
+session:
+  opening_range_start: "09:30"
+  opening_range_minutes: 15        # OR is [09:30, 09:45)
+  entry_cutoff: "10:30"            # no *new* entries after this
+  hard_close: "15:55"              # force-flatten any open position, no exceptions
+  timezone: "America/New_York"
+
+opening_range_filter:
+  min_width_points: 10.0
+  max_width_points: 32.0
+
+entry:
+  buffer_points: 0.5               # stop-entry buffer beyond OR high/low
+                                    # (2.0 under evaluation per recent backtests)
+
+risk:
+  risk_pct_of_equity: 0.01         # 1% of current account equity per trade
+  min_contracts: 1
+  max_contracts_sanity_cap: 20     # reject/alert if computed size exceeds this
+
+exits:
+  breakeven_r_multiple: 1.0        # move stop to breakeven at +1R (always active)
+  tp1_r_multiple: 1.5
+  tp1_close_pct: 0.90              # close 90% of position at TP1 (0.50 also tested)
+
+  runner:
+    mode: "old"                   # "old" or "new" - selectable, not hardcoded
+
+    old:
+      sma_period: 9
+      sma_timeframe_minutes: 5
+      cap_r_multiple: 2.0          # hard exit at +2R or close-through-SMA
+
+    new:
+      sma_period: 9
+      sma_timeframe_minutes: 15
+      candle_lookback: 1           # phase B: trail low/high of N candles back
+
+  whipsaw_guard:
+    time: "15:00"
+    # if profitable but < +1R by this time, force stop to breakeven
+
+fomc:
+  enabled: false                   # optional/toggleable, not yet adopted
+  flatten_before: "14:00"
+  # Maintained explicitly - update annually from federalreserve.gov/monetarypolicy
+  # FOMC decision dates. See data/fomc_dates.yaml.
+  dates_file: "data/fomc_dates.yaml"
+
+safety:
+  daily_loss_limit_usd: 500.0      # force-flatten + halt trading for the day
+  daily_loss_limit_pct_of_equity: null   # optional alternative; null = use USD figure
+  max_orders_per_day: 1            # one trade per day, no pyramiding/re-entry
+
+logging:
+  log_dir: "logs"
+  decision_log_file: "logs/decisions.jsonl"
+  trade_log_file: "logs/trade_log.csv"
+  level: "INFO"

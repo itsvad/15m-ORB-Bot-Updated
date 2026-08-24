@@ -1,0 +1,19 @@
+# Explicit, maintained list of FOMC interest-rate decision dates (the day the
+# statement/press conference occurs, ET). This is NOT scraped or guessed -
+# update it manually once a year from the Fed's published schedule:
+# https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
+#
+# Only used when fomc.enabled: true in config.yaml.
+
+# 2026 schedule (verify against the Fed's site before relying on this list -
+# it was compiled from the publicly posted calendar and should be
+# re-confirmed each January, since the Fed sometimes revises later-year dates).
+2026:
+  - "2026-01-28"
+  - "2026-03-18"
+  - "2026-04-29"
+  - "2026-06-17"
+  - "2026-07-29"
+  - "2026-09-16"
+  - "2026-10-28"
+  - "2026-12-09"

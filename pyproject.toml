@@ -1,0 +1,33 @@
+[project]
+name = "orb-bot"
+version = "0.1.0"
+description = "Automated Range Breakout (ORB) trading bot for ES/MES futures via Tradovate"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "pyyaml>=6.0",
+    "httpx>=0.27",
+    "websockets>=12.0",
+    "python-telegram-bot>=21.0",
+    "tzdata>=2024.1",
+    "APScheduler>=3.10",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "freezegun>=1.4",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

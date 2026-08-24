@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# secrets / local config
+.env
+*.local.yaml
+
+# runtime state & logs (not source)
+state.db
+state.db-journal
+logs/
+*.log
+*.jsonl

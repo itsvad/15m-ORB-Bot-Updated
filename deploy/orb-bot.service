@@ -1,0 +1,16 @@
+[Unit]
+Description=Range Breakout Strategy trading bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=orb-bot
+WorkingDirectory=/opt/orb-bot
+EnvironmentFile=/opt/orb-bot/.env
+ExecStart=/opt/orb-bot/.venv/bin/python -m orb_bot.app --config config/config.yaml
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target
