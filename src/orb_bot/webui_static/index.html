@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ORB Bot Settings</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #0f1216;
+    --panel: #171b21;
+    --border: #2a2f38;
+    --text: #e8eaed;
+    --muted: #9aa4b2;
+    --accent: #4f8cff;
+    --accent-text: #ffffff;
+    --danger: #e5484d;
+    --ok: #3dd68c;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f5f6f8; --panel: #ffffff; --border: #e2e5ea;
+      --text: #14181f; --muted: #5b6472; --accent: #2f6fed;
+      --accent-text: #ffffff; --danger: #c8323a; --ok: #1c9a63;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 24px 16px 80px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+  form { max-width: 780px; margin: 0 auto; }
+  fieldset {
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 20px 20px; margin-bottom: 18px; background: var(--panel);
+  }
+  legend { padding: 0 8px; font-weight: 600; font-size: 14px; }
+  .hint { color: var(--muted); font-size: 12.5px; margin: 2px 0 12px; }
+  .row { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 14px; }
+  .field { flex: 1 1 200px; min-width: 160px; }
+  .field label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=number], input[type=time], select {
+    width: 100%; padding: 8px 10px; border-radius: 6px;
+    border: 1px solid var(--border); background: transparent; color: var(--text);
+    font-size: 14px;
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; }
+  .checkbox-row input { width: auto; }
+  .runner-panel { border: 1px dashed var(--border); border-radius: 8px; padding: 12px 14px; margin-top: 10px; }
+  .runner-panel.hidden { display: none; }
+  .actions {
+    position: sticky; bottom: 0; background: var(--bg);
+    padding: 14px 0; display: flex; align-items: center; gap: 12px;
+    border-top: 1px solid var(--border); margin-top: 8px;
+  }
+  button {
+    background: var(--accent); color: var(--accent-text); border: none;
+    padding: 10px 20px; border-radius: 7px; font-size: 14px; font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  #status { font-size: 13.5px; }
+  #status.ok { color: var(--ok); }
+  #status.err { color: var(--danger); }
+  .errors { color: var(--danger); font-size: 13px; margin-top: 8px; white-space: pre-wrap; }
+  .banner {
+    max-width: 780px; margin: 0 auto 16px; padding: 10px 14px; border-radius: 8px;
+    background: rgba(79, 140, 255, 0.12); border: 1px solid var(--accent); font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<form id="settings-form">
+  <h1>ORB Bot Settings</h1>
+  <div class="subtitle">Edits validate against the same schema the bot itself enforces at startup. Changes apply starting the <strong>next</strong> trading session - never mid-trade.</div>
+
+  <div class="banner">Currently loaded from <code id="config-path-label">config.yaml</code>.</div>
+
+  <fieldset>
+    <legend>Instrument</legend>
+    <div class="row">
+      <div class="field">
+        <label for="symbol">Symbol</label>
+        <select id="symbol"></select>
+      </div>
+      <div class="field">
+        <label>Point value ($/pt)</label>
+        <input type="text" id="point_value_display" disabled>
+      </div>
+      <div class="field">
+        <label for="tick_size">Tick size</label>
+        <input type="number" step="0.01" id="tick_size">
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Trading times (America/New_York)</legend>
+    <div class="row">
+      <div class="field">
+        <label for="or_start">Opening range start</label>
+        <input type="time" id="or_start">
+      </div>
+      <div class="field">
+        <label for="or_minutes">Opening range length (minutes)</label>
+        <input type="number" min="1" id="or_minutes">
+      </div>
+      <div class="field">
+        <label for="entry_cutoff">Entry cutoff (no new entries after)</label>
+        <input type="time" id="entry_cutoff">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="hard_close">Hard close (force-flatten)</label>
+        <input type="time" id="hard_close">
+      </div>
+      <div class="field">
+        <label for="whipsaw_time">Whipsaw guard time</label>
+        <input type="time" id="whipsaw_time">
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Opening range width filter</legend>
+    <div class="hint">Only trade if the opening range width falls inside this point range.</div>
+    <div class="row">
+      <div class="field">
+        <label for="or_min_width">Min width (points)</label>
+        <input type="number" step="0.5" id="or_min_width">
+      </div>
+      <div class="field">
+        <label for="or_max_width">Max width (points)</label>
+        <input type="number" step="0.5" id="or_max_width">
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Entry</legend>
+    <div class="row">
+      <div class="field">
+        <label for="buffer_points">Point buffer outside the range</label>
+        <input type="number" step="0.25" id="buffer_points">
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Risk &amp; sizing</legend>
+    <div class="row">
+      <div class="field">
+        <label for="risk_pct">Risk per trade (% of equity)</label>
+        <input type="number" step="0.1" id="risk_pct">
+      </div>
+      <div class="field">
+        <label for="min_contracts">Minimum contracts</label>
+        <input type="number" min="1" id="min_contracts">
+      </div>
+      <div class="field">
+        <label for="max_cap">Sanity cap (max contracts)</label>
+        <input type="number" min="1" id="max_cap">
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Targets (RR) &amp; runner size</legend>
+    <div class="row">
+      <div class="field">
+        <label for="breakeven_r">Move to breakeven at (R)</label>
+        <input type="number" step="0.1" id="breakeven_r">
+      </div>
+      <div class="field">
+        <label for="tp1_r">TP1 target (R)</label>
+        <input type="number" step="0.1" id="tp1_r">
+      </div>
+      <div class="field">
+        <label for="runner_pct">% left running past TP1</label>
+        <input type="number" step="1" min="0" max="100" id="runner_pct">
+      </div>
+    </div>
+    <div class="hint" id="runner-close-hint"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Runner trail mode</legend>
+    <div class="row">
+      <div class="field">
+        <label for="runner_mode">Mode</label>
+        <select id="runner_mode">
+          <option value="old">Old (9-SMA ratchet, hard R cap)</option>
+          <option value="new">New (SMA-follow -&gt; candle trail, two phases)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="runner-panel" id="runner-old-panel">
+      <div class="row">
+        <div class="field"><label for="old_sma_period">SMA period</label><input type="number" min="2" id="old_sma_period"></div>
+        <div class="field"><label for="old_sma_tf">SMA timeframe (min)</label><input type="number" min="1" id="old_sma_tf"></div>
+        <div class="field"><label for="old_cap_r">Hard cap (R)</label><input type="number" step="0.1" id="old_cap_r"></div>
+      </div>
+    </div>
+
+    <div class="runner-panel" id="runner-new-panel">
+      <div class="row">
+        <div class="field"><label for="new_sma_period">SMA period</label><input type="number" min="2" id="new_sma_period"></div>
+        <div class="field"><label for="new_sma_tf">SMA timeframe (min)</label><input type="number" min="1" id="new_sma_tf"></div>
+        <div class="field"><label for="new_lookback">Phase B candle lookback</label><input type="number" min="1" id="new_lookback"></div>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>FOMC handling</legend>
+    <div class="checkbox-row" style="margin-bottom: 12px;">
+      <input type="checkbox" id="fomc_enabled">
+      <label for="fomc_enabled" style="margin:0;">Flatten before FOMC decisions</label>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="fomc_time">Flatten before (time)</label>
+        <input type="time" id="fomc_time">
+      </div>
+    </div>
+    <div class="hint">Dates come from <code>data/fomc_dates.yaml</code> - update that file yearly; not editable here.</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Safety</legend>
+    <div class="row">
+      <div class="field">
+        <label for="daily_loss_limit">Daily loss limit ($)</label>
+        <input type="number" step="10" id="daily_loss_limit">
+      </div>
+    </div>
+    <div class="hint">Hits this and the bot force-flattens and halts new entries for the rest of the day. One trade per day is enforced structurally and isn't editable here.</div>
+  </fieldset>
+
+  <div class="actions">
+    <button type="submit" id="save-btn">Save changes</button>
+    <button type="button" class="secondary" id="reload-btn">Discard &amp; reload</button>
+    <span id="status"></span>
+  </div>
+  <div class="errors" id="errors"></div>
+</form>
+
+<script>
+let currentConfig = null;
+let knownPointValues = {};
+
+function hhmm(isoTime) {
+  return (isoTime || "00:00:00").slice(0, 5);
+}
+function withSeconds(hhmmVal) {
+  return hhmmVal.length === 5 ? hhmmVal + ":00" : hhmmVal;
+}
+
+async function loadAll() {
+  const [metaRes, cfgRes] = await Promise.all([
+    fetch("/api/meta"), fetch("/api/config")
+  ]);
+  if (!cfgRes.ok) {
+    setStatus("Failed to load config.yaml - " + (await cfgRes.text()), true);
+    return;
+  }
+  const meta = await metaRes.json();
+  knownPointValues = meta.known_point_values;
+  currentConfig = await cfgRes.json();
+  populateSymbolOptions();
+  populateForm(currentConfig);
+}
+
+function populateSymbolOptions() {
+  const sel = document.getElementById("symbol");
+  sel.innerHTML = "";
+  for (const sym of Object.keys(knownPointValues)) {
+    const opt = document.createElement("option");
+    opt.value = sym; opt.textContent = `${sym} ($${knownPointValues[sym]}/pt)`;
+    sel.appendChild(opt);
+  }
+  const other = document.createElement("option");
+  other.value = "__other__"; other.textContent = "Other (custom, not point-value-checked)";
+  sel.appendChild(other);
+  sel.addEventListener("change", updatePointValueDisplay);
+}
+
+function updatePointValueDisplay() {
+  const sym = document.getElementById("symbol").value;
+  const display = document.getElementById("point_value_display");
+  display.value = knownPointValues[sym] !== undefined ? knownPointValues[sym] : "(custom - keep tick size correct)";
+}
+
+function populateForm(cfg) {
+  document.getElementById("config-path-label").textContent = "config/config.yaml";
+
+  const sym = cfg.instrument.symbol;
+  const sel = document.getElementById("symbol");
+  if ([...sel.options].some(o => o.value === sym)) sel.value = sym;
+  else sel.value = "__other__";
+  updatePointValueDisplay();
+  document.getElementById("tick_size").value = cfg.instrument.tick_size;
+
+  document.getElementById("or_start").value = hhmm(cfg.session.opening_range_start);
+  document.getElementById("or_minutes").value = cfg.session.opening_range_minutes;
+  document.getElementById("entry_cutoff").value = hhmm(cfg.session.entry_cutoff);
+  document.getElementById("hard_close").value = hhmm(cfg.session.hard_close);
+  document.getElementById("whipsaw_time").value = hhmm(cfg.exits.whipsaw_guard.time);
+
+  document.getElementById("or_min_width").value = cfg.opening_range_filter.min_width_points;
+  document.getElementById("or_max_width").value = cfg.opening_range_filter.max_width_points;
+
+  document.getElementById("buffer_points").value = cfg.entry.buffer_points;
+
+  document.getElementById("risk_pct").value = (cfg.risk.risk_pct_of_equity * 100).toFixed(2);
+  document.getElementById("min_contracts").value = cfg.risk.min_contracts;
+  document.getElementById("max_cap").value = cfg.risk.max_contracts_sanity_cap;
+
+  document.getElementById("breakeven_r").value = cfg.exits.breakeven_r_multiple;
+  document.getElementById("tp1_r").value = cfg.exits.tp1_r_multiple;
+  const runnerPct = Math.round((1 - cfg.exits.tp1_close_pct) * 100);
+  document.getElementById("runner_pct").value = runnerPct;
+  updateRunnerHint();
+
+  document.getElementById("runner_mode").value = cfg.exits.runner.mode;
+  document.getElementById("old_sma_period").value = cfg.exits.runner.old.sma_period;
+  document.getElementById("old_sma_tf").value = cfg.exits.runner.old.sma_timeframe_minutes;
+  document.getElementById("old_cap_r").value = cfg.exits.runner.old.cap_r_multiple;
+  document.getElementById("new_sma_period").value = cfg.exits.runner.new.sma_period;
+  document.getElementById("new_sma_tf").value = cfg.exits.runner.new.sma_timeframe_minutes;
+  document.getElementById("new_lookback").value = cfg.exits.runner.new.candle_lookback;
+  toggleRunnerPanels();
+
+  document.getElementById("fomc_enabled").checked = cfg.fomc.enabled;
+  document.getElementById("fomc_time").value = hhmm(cfg.fomc.flatten_before);
+
+  document.getElementById("daily_loss_limit").value = cfg.safety.daily_loss_limit_usd;
+
+  setStatus("", false);
+  document.getElementById("errors").textContent = "";
+}
+
+function toggleRunnerPanels() {
+  const mode = document.getElementById("runner_mode").value;
+  document.getElementById("runner-old-panel").classList.toggle("hidden", mode !== "old");
+  document.getElementById("runner-new-panel").classList.toggle("hidden", mode !== "new");
+}
+
+function updateRunnerHint() {
+  const pct = Number(document.getElementById("runner_pct").value || 0);
+  document.getElementById("runner-close-hint").textContent =
+    `Closes ${(100 - pct).toFixed(0)}% of the position at TP1, leaves ${pct}% running as the runner.`;
+}
+
+function buildPayload() {
+  const symSel = document.getElementById("symbol").value;
+  const symbol = symSel === "__other__" ? currentConfig.instrument.symbol : symSel;
+  const pointValue = knownPointValues[symbol] !== undefined
+    ? knownPointValues[symbol]
+    : currentConfig.instrument.point_value;
+
+  const runnerPct = Number(document.getElementById("runner_pct").value);
+
+  return {
+    instrument: {
+      symbol,
+      point_value: pointValue,
+      tick_size: Number(document.getElementById("tick_size").value),
+    },
+    session: {
+      opening_range_start: withSeconds(document.getElementById("or_start").value),
+      opening_range_minutes: Number(document.getElementById("or_minutes").value),
+      entry_cutoff: withSeconds(document.getElementById("entry_cutoff").value),
+      hard_close: withSeconds(document.getElementById("hard_close").value),
+      timezone: "America/New_York",
+    },
+    opening_range_filter: {
+      min_width_points: Number(document.getElementById("or_min_width").value),
+      max_width_points: Number(document.getElementById("or_max_width").value),
+    },
+    entry: {
+      buffer_points: Number(document.getElementById("buffer_points").value),
+    },
+    risk: {
+      risk_pct_of_equity: Number(document.getElementById("risk_pct").value) / 100,
+      min_contracts: Number(document.getElementById("min_contracts").value),
+      max_contracts_sanity_cap: Number(document.getElementById("max_cap").value),
+    },
+    exits: {
+      breakeven_r_multiple: Number(document.getElementById("breakeven_r").value),
+      tp1_r_multiple: Number(document.getElementById("tp1_r").value),
+      tp1_close_pct: (100 - runnerPct) / 100,
+      runner: {
+        mode: document.getElementById("runner_mode").value,
+        old: {
+          sma_period: Number(document.getElementById("old_sma_period").value),
+          sma_timeframe_minutes: Number(document.getElementById("old_sma_tf").value),
+          cap_r_multiple: Number(document.getElementById("old_cap_r").value),
+        },
+        new: {
+          sma_period: Number(document.getElementById("new_sma_period").value),
+          sma_timeframe_minutes: Number(document.getElementById("new_sma_tf").value),
+          candle_lookback: Number(document.getElementById("new_lookback").value),
+        },
+      },
+      whipsaw_guard: { time: withSeconds(document.getElementById("whipsaw_time").value) },
+    },
+    fomc: {
+      enabled: document.getElementById("fomc_enabled").checked,
+      flatten_before: withSeconds(document.getElementById("fomc_time").value),
+      dates_file: currentConfig.fomc.dates_file,
+    },
+    safety: {
+      daily_loss_limit_usd: Number(document.getElementById("daily_loss_limit").value),
+      daily_loss_limit_pct_of_equity: currentConfig.safety.daily_loss_limit_pct_of_equity,
+      max_orders_per_day: 1,
+    },
+    logging: currentConfig.logging,
+  };
+}
+
+function setStatus(msg, isErr) {
+  const el = document.getElementById("status");
+  el.textContent = msg;
+  el.className = isErr ? "err" : "ok";
+}
+
+document.getElementById("runner_mode").addEventListener("change", toggleRunnerPanels);
+document.getElementById("runner_pct").addEventListener("input", updateRunnerHint);
+document.getElementById("reload-btn").addEventListener("click", loadAll);
+
+document.getElementById("settings-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const saveBtn = document.getElementById("save-btn");
+  saveBtn.disabled = true;
+  document.getElementById("errors").textContent = "";
+  try {
+    const payload = buildPayload();
+    const res = await fetch("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      setStatus("Saved. Takes effect next trading session.", false);
+      currentConfig = payload;
+    } else {
+      const body = await res.json();
+      setStatus("Not saved - validation failed.", true);
+      const detail = body.detail;
+      document.getElementById("errors").textContent = Array.isArray(detail)
+        ? detail.map(d => `${d.field}: ${d.message}`).join("\n")
+        : JSON.stringify(detail);
+    }
+  } catch (err) {
+    setStatus("Save failed: " + err, true);
+  } finally {
+    saveBtn.disabled = false;
+  }
+});
+
+loadAll();
+</script>
+</body>
+</html>

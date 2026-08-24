@@ -25,7 +25,12 @@ KNOWN_POINT_VALUES: dict[str, float] = {
 
 
 def _parse_hhmm(value: str) -> dt.time:
-    h, m = value.split(":")
+    # Accepts "HH:MM" (the config.yaml convention) and "HH:MM:SS" (what
+    # AppConfig.model_dump(mode="json") round-trips through the settings
+    # web UI produces) - seconds are always :00 for this bot, so they're
+    # simply ignored rather than treated as an error.
+    parts = value.split(":")
+    h, m = parts[0], parts[1]
     return dt.time(hour=int(h), minute=int(m))
 
 

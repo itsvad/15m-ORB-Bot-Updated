@@ -40,6 +40,9 @@ set explicitly (`orb_bot/config.py::RuntimeSecrets`).
   together into an always-on service, and a wall-clock-driven hard-close
   check (`OrbEngine.on_wall_clock`) that fires independent of whether a bar
   ever arrives at exactly 15:55 (holidays/gaps/early closes).
+- A settings web UI (`orb_bot/webui.py`, `python -m orb_bot.webui`) for
+  adjusting the tunable parameters without hand-editing YAML - see
+  **Settings UI** below.
 - `scripts/replay_backtest.py`: runs the exact same engine + dry-run broker
   against a CSV of historical 1-minute bars, no network required. Try it:
 
@@ -59,6 +62,39 @@ python -m orb_bot.app --config config/config.yaml
 ```
 
 `ORB_MODE` defaults to `dry_run` in `.env.example` - leave it there.
+
+## Settings UI
+
+A small local web UI lets you adjust the tunable parameters - OR width
+range to target, R-multiples (breakeven/TP1), how much % is left running
+past TP1, runner mode + its SMA/timeframe/lookback params, trading times,
+the point buffer outside the range, risk %, sizing sanity cap, FOMC toggle,
+and the daily loss limit - without hand-editing YAML.
+
+```bash
+export ORB_WEBUI_PASSWORD=choose-something-strong   # required, no default
+python -m orb_bot.webui --config config/config.yaml --port 8787
+```
+
+Then open `http://127.0.0.1:8787` (HTTP Basic auth, username `admin` by
+default). It reads and writes `config.yaml` directly, validated against the
+exact same `AppConfig` schema the bot enforces at startup - an invalid
+combination (e.g. min width > max width, or a point value that doesn't
+match the selected symbol) is rejected with a clear error and never
+written. Every save keeps a timestamped backup of the previous version
+under `config/backups/`.
+
+**Changes apply starting the next trading session, never mid-trade** -
+`run_forever` reloads `config.yaml` fresh before scheduling each session,
+so nothing about a currently-open position's risk parameters can change
+underneath it.
+
+It binds to `127.0.0.1` by default. To reach it from your phone/laptop,
+either SSH-tunnel (`ssh -L 8787:127.0.0.1:8787 you@your-vm`) or put a TLS
+reverse proxy in front of it - Basic auth over plain HTTP beyond localhost
+is not safe for something that edits live risk parameters. See
+`deploy/orb-bot-webui.service` to run it as its own systemd unit alongside
+`deploy/orb-bot.service`.
 
 ## Config
 

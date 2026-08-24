@@ -46,8 +46,10 @@ class AppContext:
         trade_log: TradeLogWriter,
         telegram: TelegramNotifier | None,
         fomc_dates: set[dt.date],
+        config_path: str = "config/config.yaml",
     ) -> None:
         self.config = config
+        self.config_path = config_path
         self.secrets = secrets
         self.broker = broker
         self.store = store
@@ -92,7 +94,7 @@ def build_app_context(config_path: str) -> AppContext:
 
     fomc_dates = load_fomc_dates(config.fomc.dates_file) if config.fomc.enabled else set()
 
-    ctx = AppContext(config, secrets, broker, store, decision_log, trade_log, telegram, fomc_dates)
+    ctx = AppContext(config, secrets, broker, store, decision_log, trade_log, telegram, fomc_dates, config_path)
     return ctx
 
 
@@ -253,6 +255,17 @@ async def run_forever(ctx: AppContext, bar_source_factory) -> None:
 
     try:
         while True:
+            # Reload config.yaml fresh before scheduling the next session, so
+            # changes made via the settings UI (or hand-edited) take effect
+            # starting the next session - never mid-trade, and never by
+            # mutating a running engine's parameters underneath it.
+            try:
+                ctx.config = load_config(ctx.config_path)
+            except Exception:
+                logger.exception(
+                    "Failed to reload %s - keeping the previously loaded config", ctx.config_path
+                )
+
             start = next_session_start(ctx.config)
             logger.info("Next session starts at %s", start)
             await sleep_until(start)

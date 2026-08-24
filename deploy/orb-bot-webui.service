@@ -1,0 +1,20 @@
+[Unit]
+Description=Range Breakout Strategy bot - settings web UI
+After=network-online.target
+
+[Service]
+Type=simple
+User=orb-bot
+WorkingDirectory=/opt/orb-bot
+EnvironmentFile=/opt/orb-bot/.env
+# Binds to localhost only by default - reach it via an SSH tunnel
+# (ssh -L 8787:127.0.0.1:8787 you@your-vm) or put a TLS reverse proxy in
+# front of it. Do not change --host to 0.0.0.0 without adding TLS first:
+# this UI edits live risk/sizing/trading-time parameters over HTTP Basic
+# auth, which is not safe to expose in plaintext beyond localhost.
+ExecStart=/opt/orb-bot/.venv/bin/python -m orb_bot.webui --config config/config.yaml --host 127.0.0.1 --port 8787
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target
