@@ -74,6 +74,15 @@ class TestOpeningRangeFilter:
         # $/pt (MES) = 5 -> risk/contract = 105 -> floor(500/105) = 4
         assert engine.day.entry_qty == 4
 
+    def test_fixed_contracts_override_ignores_risk_pct(self, config):
+        cfg = make_config(risk={"sizing_mode": "fixed", "fixed_contracts": 7})
+        engine = OrbEngine(cfg, TRADING_DATE, EQUITY)
+        actions = place_entries(engine, or_low=5000.0, or_high=5020.0)
+
+        places = [a for a in actions if isinstance(a, PlaceStopOrder)]
+        assert all(a.qty == 7 for a in places)
+        assert engine.day.entry_qty == 7
+
 
 class TestEntryFillAndRaceCondition:
     def test_long_fill_cancels_opposite_and_places_protective_stop(self, config):

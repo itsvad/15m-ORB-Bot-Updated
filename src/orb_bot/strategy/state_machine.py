@@ -244,7 +244,9 @@ class OrbEngine:
         try:
             sizing = compute_position_size(
                 equity=self.equity,
+                sizing_mode=self.config.risk.sizing_mode,
                 risk_pct_of_equity=self.config.risk.risk_pct_of_equity,
+                fixed_contracts=self.config.risk.fixed_contracts,
                 stop_distance_points=stop_distance,
                 point_value=self.config.instrument.point_value,
                 min_contracts=self.config.risk.min_contracts,

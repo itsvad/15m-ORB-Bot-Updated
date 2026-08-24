@@ -96,9 +96,26 @@ class EntryConfig(BaseModel):
 
 
 class RiskConfig(BaseModel):
+    sizing_mode: Literal["risk_pct", "fixed"] = "risk_pct"
     risk_pct_of_equity: float = Field(gt=0, le=0.1)
+    fixed_contracts: int | None = Field(default=None, ge=1)
     min_contracts: int = Field(ge=1)
     max_contracts_sanity_cap: int = Field(ge=1)
+
+    @model_validator(mode="after")
+    def _validate_fixed_mode(self) -> "RiskConfig":
+        if self.sizing_mode == "fixed":
+            if self.fixed_contracts is None:
+                raise ValueError(
+                    "risk.fixed_contracts must be set when risk.sizing_mode is 'fixed'"
+                )
+            if self.fixed_contracts > self.max_contracts_sanity_cap:
+                raise ValueError(
+                    f"risk.fixed_contracts ({self.fixed_contracts}) exceeds "
+                    f"max_contracts_sanity_cap ({self.max_contracts_sanity_cap}) - "
+                    f"raise the sanity cap if this override is intentional"
+                )
+        return self
 
 
 class OldRunnerConfig(BaseModel):

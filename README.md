@@ -68,8 +68,10 @@ python -m orb_bot.app --config config/config.yaml
 A small local web UI lets you adjust the tunable parameters - OR width
 range to target, R-multiples (breakeven/TP1), how much % is left running
 past TP1, runner mode + its SMA/timeframe/lookback params, trading times,
-the point buffer outside the range, risk %, sizing sanity cap, FOMC toggle,
-and the daily loss limit - without hand-editing YAML.
+the point buffer outside the range, position sizing (risk % of equity, or a
+flat fixed-contracts override that ignores equity entirely), the sizing
+sanity cap, FOMC toggle, and the daily loss limit - without hand-editing
+YAML.
 
 ```bash
 export ORB_WEBUI_PASSWORD=choose-something-strong   # required, no default
@@ -222,6 +224,8 @@ sudo systemctl enable --now orb-bot
 - Position sizing refuses (raises loudly, never silently submits) a zero,
   negative, or absurd computed size, and a misconfigured point value is
   rejected at config load time against known contract specs
-  (`config.py::KNOWN_POINT_VALUES`, `sizing.py::InvalidSizingInput`).
+  (`config.py::KNOWN_POINT_VALUES`, `sizing.py::InvalidSizingInput`). The
+  `max_contracts_sanity_cap` applies in both sizing modes - a fixed-contract
+  override above it is rejected at config-save time, not silently clamped.
 - One trade per day is enforced structurally (`safety.max_orders_per_day`
   is pinned to exactly `1` in the config schema).

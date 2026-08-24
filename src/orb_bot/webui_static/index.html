@@ -157,17 +157,40 @@
     <legend>Risk &amp; sizing</legend>
     <div class="row">
       <div class="field">
-        <label for="risk_pct">Risk per trade (% of equity)</label>
-        <input type="number" step="0.1" id="risk_pct">
-      </div>
-      <div class="field">
-        <label for="min_contracts">Minimum contracts</label>
-        <input type="number" min="1" id="min_contracts">
+        <label for="sizing_mode">Sizing mode</label>
+        <select id="sizing_mode">
+          <option value="risk_pct">Risk % of equity (computed)</option>
+          <option value="fixed">Fixed contracts (override)</option>
+        </select>
       </div>
       <div class="field">
         <label for="max_cap">Sanity cap (max contracts)</label>
         <input type="number" min="1" id="max_cap">
       </div>
+    </div>
+    <div class="hint">The sanity cap always applies, in either mode - a fixed override above it is rejected, not silently clamped.</div>
+
+    <div class="runner-panel" id="sizing-risk-pct-panel">
+      <div class="row">
+        <div class="field">
+          <label for="risk_pct">Risk per trade (% of equity)</label>
+          <input type="number" step="0.1" id="risk_pct">
+        </div>
+        <div class="field">
+          <label for="min_contracts">Minimum contracts</label>
+          <input type="number" min="1" id="min_contracts">
+        </div>
+      </div>
+    </div>
+
+    <div class="runner-panel" id="sizing-fixed-panel">
+      <div class="row">
+        <div class="field">
+          <label for="fixed_contracts">Contracts per trade (fixed)</label>
+          <input type="number" min="1" id="fixed_contracts">
+        </div>
+      </div>
+      <div class="hint">Ignores equity and risk % entirely - always trades this many contracts.</div>
     </div>
   </fieldset>
 
@@ -320,9 +343,12 @@ function populateForm(cfg) {
 
   document.getElementById("buffer_points").value = cfg.entry.buffer_points;
 
+  document.getElementById("sizing_mode").value = cfg.risk.sizing_mode;
   document.getElementById("risk_pct").value = (cfg.risk.risk_pct_of_equity * 100).toFixed(2);
   document.getElementById("min_contracts").value = cfg.risk.min_contracts;
+  document.getElementById("fixed_contracts").value = cfg.risk.fixed_contracts ?? "";
   document.getElementById("max_cap").value = cfg.risk.max_contracts_sanity_cap;
+  toggleSizingPanels();
 
   document.getElementById("breakeven_r").value = cfg.exits.breakeven_r_multiple;
   document.getElementById("tp1_r").value = cfg.exits.tp1_r_multiple;
@@ -352,6 +378,12 @@ function toggleRunnerPanels() {
   const mode = document.getElementById("runner_mode").value;
   document.getElementById("runner-old-panel").classList.toggle("hidden", mode !== "old");
   document.getElementById("runner-new-panel").classList.toggle("hidden", mode !== "new");
+}
+
+function toggleSizingPanels() {
+  const mode = document.getElementById("sizing_mode").value;
+  document.getElementById("sizing-risk-pct-panel").classList.toggle("hidden", mode !== "risk_pct");
+  document.getElementById("sizing-fixed-panel").classList.toggle("hidden", mode !== "fixed");
 }
 
 function updateRunnerHint() {
@@ -390,7 +422,11 @@ function buildPayload() {
       buffer_points: Number(document.getElementById("buffer_points").value),
     },
     risk: {
+      sizing_mode: document.getElementById("sizing_mode").value,
       risk_pct_of_equity: Number(document.getElementById("risk_pct").value) / 100,
+      fixed_contracts: document.getElementById("fixed_contracts").value
+        ? Number(document.getElementById("fixed_contracts").value)
+        : null,
       min_contracts: Number(document.getElementById("min_contracts").value),
       max_contracts_sanity_cap: Number(document.getElementById("max_cap").value),
     },
@@ -434,6 +470,7 @@ function setStatus(msg, isErr) {
 }
 
 document.getElementById("runner_mode").addEventListener("change", toggleRunnerPanels);
+document.getElementById("sizing_mode").addEventListener("change", toggleSizingPanels);
 document.getElementById("runner_pct").addEventListener("input", updateRunnerHint);
 document.getElementById("reload-btn").addEventListener("click", loadAll);
 

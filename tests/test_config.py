@@ -38,3 +38,27 @@ def test_entry_cutoff_before_or_end_is_rejected():
                 "timezone": "America/New_York",
             }
         )
+
+
+def test_risk_pct_sizing_mode_is_the_default():
+    cfg = make_config()
+    assert cfg.risk.sizing_mode == "risk_pct"
+    assert cfg.risk.fixed_contracts is None
+
+
+def test_fixed_sizing_mode_requires_a_fixed_contracts_value():
+    with pytest.raises(ValidationError, match="fixed_contracts must be set"):
+        make_config(risk={"sizing_mode": "fixed", "fixed_contracts": None})
+
+
+def test_fixed_sizing_mode_rejects_a_value_above_the_sanity_cap():
+    with pytest.raises(ValidationError, match="exceeds max_contracts_sanity_cap"):
+        make_config(
+            risk={"sizing_mode": "fixed", "fixed_contracts": 50, "max_contracts_sanity_cap": 20}
+        )
+
+
+def test_fixed_sizing_mode_accepted_within_the_cap():
+    cfg = make_config(risk={"sizing_mode": "fixed", "fixed_contracts": 3})
+    assert cfg.risk.sizing_mode == "fixed"
+    assert cfg.risk.fixed_contracts == 3

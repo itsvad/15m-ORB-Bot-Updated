@@ -23,9 +23,14 @@ entry:
                                     # (2.0 under evaluation per recent backtests)
 
 risk:
+  sizing_mode: "risk_pct"          # "risk_pct" (computed) or "fixed" (override below)
   risk_pct_of_equity: 0.01         # 1% of current account equity per trade
+  fixed_contracts: null            # used only when sizing_mode is "fixed"
   min_contracts: 1
   max_contracts_sanity_cap: 20     # reject/alert if computed size exceeds this
+                                    # (applies to BOTH modes, including the
+                                    # fixed override - it's a hard rail, not
+                                    # just a risk_pct sanity check)
 
 exits:
   breakeven_r_multiple: 1.0        # move stop to breakeven at +1R (always active)
