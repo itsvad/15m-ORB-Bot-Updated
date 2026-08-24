@@ -306,8 +306,13 @@ async def run_forever(ctx: AppContext, bar_source_factory) -> None:
             await sleep_until(start)
 
             trading_date = now_ny().date()
-            ctx.bar_source = bar_source_factory()
             try:
+                # Constructing the bar source (e.g. no Tradovate credentials
+                # configured yet) can fail just as easily as the session
+                # itself - both need to land in the same retry-not-crash
+                # path, or a misconfigured .env would crash-loop the whole
+                # process instead of just logging and waiting.
+                ctx.bar_source = bar_source_factory()
                 await run_trading_session(ctx, trading_date)
             except Exception:
                 logger.exception("Session for %s crashed - will retry next scheduled session", trading_date)

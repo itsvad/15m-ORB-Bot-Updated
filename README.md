@@ -205,17 +205,36 @@ being trusted - which is exactly why dry-run verification comes first.
 
 ## Deployment
 
-`deploy/orb-bot.service` is a systemd unit for a small Linux VM
-(DigitalOcean/AWS-equivalent). It runs `python -m orb_bot.app`, which sleeps
-outside the trading window and wakes automatically each session -
-`WARMUP_BUFFER_MINUTES`/`WIND_DOWN_BUFFER_MINUTES` in `scheduler.py` control
-how early/late it stays connected around the session.
+Any small Linux VM works (DigitalOcean/Hetzner/Vultr's cheapest tier,
+AWS Lightsail, an Oracle Cloud free-tier instance - this is light enough
+that specs barely matter). On a fresh Ubuntu 22.04+/Debian box:
 
 ```bash
-sudo cp deploy/orb-bot.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now orb-bot
+sudo mkdir -p /opt/orb-bot && sudo chown "$USER" /opt/orb-bot
+git clone <your-repo-url> /opt/orb-bot
+cd /opt/orb-bot
+sudo bash deploy/setup.sh
 ```
+
+`deploy/setup.sh` creates a dedicated `orb-bot` system user, sets up the
+venv, installs the package, scaffolds `.env` from `.env.example` (never
+overwriting one that already exists), and installs+enables
+`deploy/orb-bot.service` (the trading loop) plus `deploy/orb-bot-webui.service`
+(the settings UI, only if `ORB_WEBUI_PASSWORD` is already set in `.env`).
+It's safe to re-run any time, e.g. after `git pull` to deploy an update.
+
+Edit `/opt/orb-bot/.env` with your real credentials, then:
+
+```bash
+sudo systemctl restart orb-bot
+journalctl -u orb-bot -f      # watch it start up / confirm no errors
+```
+
+`python -m orb_bot.app` sleeps outside the trading window and wakes
+automatically each session - `WARMUP_BUFFER_MINUTES`/
+`WIND_DOWN_BUFFER_MINUTES` in `scheduler.py` control how early/late it
+stays connected around the session. `Restart=on-failure` in the unit
+means it recovers on its own from a crash or VM reboot.
 
 ## Safety rails (hardcoded, not config-toggleable off)
 
