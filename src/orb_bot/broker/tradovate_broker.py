@@ -19,9 +19,9 @@ import logging
 from orb_bot.broker.base import Broker
 from orb_bot.broker.tradovate_client import (
     URLS,
+    TradovateMarketData,
     TradovateRestClient,
     TradovateSocket,
-    bars_from_chart_response,
 )
 from orb_bot.config import RuntimeSecrets
 from orb_bot.strategy.models import (
@@ -53,6 +53,9 @@ class TradovateBroker(Broker):
         self.user_ws = TradovateSocket(
             URLS[secrets.tradovate_env]["ws"], self._get_access_token
         )
+        # Shares this broker's authenticated REST client rather than opening
+        # a second token lifecycle for market data.
+        self.market_data = TradovateMarketData(secrets, symbol, rest_client=self.rest)
         self.account_id: int | None = None
         self.account_spec: str | None = None
         # order_ref (engine-internal) <-> Tradovate order id
@@ -107,26 +110,7 @@ class TradovateBroker(Broker):
         )
 
     async def get_recent_bars(self, lookback_minutes: int) -> list[Bar]:
-        md_socket = TradovateSocket(URLS["md_ws"], self._get_md_token)
-        await md_socket.connect()
-        try:
-            resp = await md_socket.request(
-                "md/getChart",
-                {
-                    "symbol": self.symbol,
-                    "chartDescription": {"underlyingType": "MinuteBar", "elementSize": 1, "elementSizeUnit": "UnderlyingUnits"},
-                    "timeRange": {"asMuchAsElements": lookback_minutes},
-                },
-            )
-            return bars_from_chart_response(resp.get("d", resp))
-        finally:
-            await md_socket.close()
-
-    async def _get_md_token(self) -> str:
-        if not self.rest.token.valid():
-            await self.rest.authenticate()
-        assert self.rest.token.md_access_token is not None
-        return self.rest.token.md_access_token
+        return await self.market_data.get_recent_bars(lookback_minutes)
 
     # -- action execution --------------------------------------------------
 

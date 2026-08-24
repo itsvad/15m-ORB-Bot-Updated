@@ -281,3 +281,60 @@ def bars_from_chart_response(chart_data: dict) -> list[Bar]:
             )
         )
     return bars
+
+
+class TradovateMarketData:
+    """Read-only market-data access (recent 1-minute bars), independent of
+    any order-placement path. This is what lets dry-run mode watch a real
+    Tradovate demo feed without the DryRunBroker (which deliberately knows
+    nothing about market data - see its docstring) ever needing order-level
+    credentials or touching the order-placement code path at all.
+
+    `TradovateBroker` also uses this internally for its own `get_recent_bars`,
+    so there is exactly one implementation of the (best-effort, unverified -
+    see this module's docstring) md/getChart bar-fetching logic.
+    """
+
+    def __init__(
+        self, secrets: RuntimeSecrets, symbol: str, rest_client: "TradovateRestClient | None" = None
+    ) -> None:
+        self.secrets = secrets
+        self.symbol = symbol
+        # A caller that already holds an authenticated TradovateRestClient
+        # (e.g. TradovateBroker) can share it here rather than this class
+        # opening a second, redundant REST connection/token lifecycle.
+        self.rest = rest_client if rest_client is not None else TradovateRestClient(secrets)
+        self._owns_rest = rest_client is None
+
+    async def connect(self) -> None:
+        await self.rest.authenticate()
+
+    async def close(self) -> None:
+        if self._owns_rest:
+            await self.rest.close()
+
+    async def _get_md_token(self) -> str:
+        if not self.rest.token.valid():
+            await self.rest.authenticate()
+        assert self.rest.token.md_access_token is not None
+        return self.rest.token.md_access_token
+
+    async def get_recent_bars(self, lookback_minutes: int) -> list[Bar]:
+        md_socket = TradovateSocket(URLS["md_ws"], self._get_md_token)
+        await md_socket.connect()
+        try:
+            resp = await md_socket.request(
+                "md/getChart",
+                {
+                    "symbol": self.symbol,
+                    "chartDescription": {
+                        "underlyingType": "MinuteBar",
+                        "elementSize": 1,
+                        "elementSizeUnit": "UnderlyingUnits",
+                    },
+                    "timeRange": {"asMuchAsElements": lookback_minutes},
+                },
+            )
+            return bars_from_chart_response(resp.get("d", resp))
+        finally:
+            await md_socket.close()

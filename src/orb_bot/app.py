@@ -12,6 +12,7 @@ from orb_bot.broker.bar_source import BarSource, PollingTradovateBarSource, Repl
 from orb_bot.broker.base import Broker
 from orb_bot.broker.dry_run_broker import DryRunBroker
 from orb_bot.broker.tradovate_broker import TradovateBroker
+from orb_bot.broker.tradovate_client import TradovateMarketData
 from orb_bot.config import AppConfig, RuntimeSecrets, load_config
 from orb_bot.fomc import load_fomc_dates
 from orb_bot.logging_setup import DecisionLogger, TradeLogWriter, configure_logging
@@ -60,6 +61,14 @@ class AppContext:
         self._trade_context: dict = {}
         self._current_engine: OrbEngine | None = None
         self.bar_source: BarSource | None = None
+        # Read-only market-data connection. In live mode this is the same
+        # object as broker.market_data (shares its authenticated REST
+        # client); in dry-run mode it's a standalone connection so dry-run
+        # can watch a real demo feed without the order-placement broker
+        # ever being involved. None if no Tradovate credentials are
+        # configured at all (replay-only mode - see scripts/replay_backtest.py).
+        self.market_data: TradovateMarketData | None = None
+        self._owns_market_data = False
 
 
 def build_app_context(config_path: str) -> AppContext:
@@ -70,6 +79,10 @@ def build_app_context(config_path: str) -> AppContext:
     store = StateStore(secrets.state_db_path)
     decision_log = DecisionLogger(config.logging.decision_log_file)
     trade_log = TradeLogWriter(config.logging.trade_log_file)
+
+    has_tradovate_credentials = bool(
+        secrets.tradovate_username and secrets.tradovate_password
+    )
 
     if secrets.mode == "live":
         broker: Broker = TradovateBroker(secrets, config.instrument.symbol)
@@ -95,6 +108,24 @@ def build_app_context(config_path: str) -> AppContext:
     fomc_dates = load_fomc_dates(config.fomc.dates_file) if config.fomc.enabled else set()
 
     ctx = AppContext(config, secrets, broker, store, decision_log, trade_log, telegram, fomc_dates, config_path)
+
+    if isinstance(broker, TradovateBroker):
+        # Live mode: reuse the broker's own market-data connection (shares
+        # its authenticated REST client) rather than opening a second one.
+        ctx.market_data = broker.market_data
+        ctx._owns_market_data = False
+    elif has_tradovate_credentials:
+        # Dry-run mode with real credentials configured: watch a real demo
+        # feed without the order-placement broker ever being involved.
+        ctx.market_data = TradovateMarketData(secrets, config.instrument.symbol)
+        ctx._owns_market_data = True
+    else:
+        logger.warning(
+            "No Tradovate credentials configured - dry-run has no live bar "
+            "source. Use scripts/replay_backtest.py against historical "
+            "bars, or set TRADOVATE_USERNAME/TRADOVATE_PASSWORD in .env."
+        )
+
     return ctx
 
 
@@ -200,13 +231,15 @@ async def run_trading_session(ctx: AppContext, trading_date: dt.date) -> None:
     ctx._trade_context = {}
 
     if restored is not None and restored.or_finalized:
+        bar_getter = ctx.market_data.get_recent_bars if ctx.market_data else ctx.broker.get_recent_bars
         try:
-            warmup_bars = await ctx.broker.get_recent_bars(120)
+            warmup_bars = await bar_getter(120)
             engine.warm_up_indicators(warmup_bars)
         except NotImplementedError:
             logger.warning(
-                "Broker cannot supply warm-up bars after restart; runner SMA "
-                "history will rebuild from live bars only (documented v1 gap)."
+                "No market-data source available to supply warm-up bars "
+                "after restart; runner SMA history will rebuild from live "
+                "bars only."
             )
 
     _, session_end = session_window_for(ctx.config, trading_date)
@@ -250,6 +283,8 @@ async def run_forever(ctx: AppContext, bar_source_factory) -> None:
     """The always-on loop: sleep outside the trading window, run one full
     session, repeat - forever."""
     await ctx.broker.connect()
+    if ctx._owns_market_data and ctx.market_data is not None:
+        await ctx.market_data.connect()
     if ctx.telegram:
         await ctx.telegram.start()
 
@@ -285,18 +320,20 @@ async def run_forever(ctx: AppContext, bar_source_factory) -> None:
             await asyncio.sleep(5)
     finally:
         await ctx.broker.close()
+        if ctx._owns_market_data and ctx.market_data is not None:
+            await ctx.market_data.close()
         if ctx.telegram:
             await ctx.telegram.stop()
 
 
 def _default_bar_source_factory(ctx: AppContext) -> BarSource:
-    if isinstance(ctx.broker, TradovateBroker):
-        return PollingTradovateBarSource(ctx.broker.get_recent_bars)
+    if ctx.market_data is not None:
+        return PollingTradovateBarSource(ctx.market_data.get_recent_bars)
     raise RuntimeError(
-        "No live bar source available for this broker; dry-run against live "
-        "data requires wiring a read-only Tradovate market-data connection "
-        "(see README) - for now, run scripts/replay_backtest.py against "
-        "historical bars to exercise the full pipeline."
+        "No live bar source available: no Tradovate credentials are "
+        "configured (see .env's TRADOVATE_USERNAME/TRADOVATE_PASSWORD). "
+        "For now, run scripts/replay_backtest.py against historical bars "
+        "to exercise the full pipeline without live credentials."
     )
 
 
